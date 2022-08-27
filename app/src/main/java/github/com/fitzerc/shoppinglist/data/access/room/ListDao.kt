@@ -3,6 +3,7 @@ package github.com.fitzerc.shoppinglist.data.access.room.ListDao
 import androidx.room.*
 import github.com.fitzerc.shoppinglist.data.ListDto
 import kotlinx.coroutines.flow.Flow
+import kotlinx.coroutines.flow.MutableStateFlow
 import java.util.*
 
 @Dao
