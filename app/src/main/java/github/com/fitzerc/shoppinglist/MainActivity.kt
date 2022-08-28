@@ -18,6 +18,7 @@ import androidx.compose.ui.ExperimentalComposeUiApi
 import androidx.compose.ui.Modifier
 import androidx.compose.ui.tooling.preview.Preview
 import dagger.hilt.android.AndroidEntryPoint
+import github.com.fitzerc.shoppinglist.data.EntryDto
 import github.com.fitzerc.shoppinglist.data.ListDto
 import github.com.fitzerc.shoppinglist.data.access.room.ShoppingListDatabase
 import github.com.fitzerc.shoppinglist.ui.theme.ShoppingListTheme
@@ -41,7 +42,7 @@ class MainActivity : ComponentActivity() {
         val viewModel = viewModels<MainActivityViewModel>()
 
         setContent {
-            ShoppingListTheme{
+            ShoppingListTheme {
                 MainContent(viewModel)
             }
         }
@@ -50,27 +51,33 @@ class MainActivity : ComponentActivity() {
 }
 
 @Composable
-fun MainContent(viewModel: Lazy<MainActivityViewModel>){
+fun MainContent(viewModel: Lazy<MainActivityViewModel>) {
     val lists = viewModel.value.lists.collectAsState().value
     val scope = CoroutineScope(Dispatchers.IO)
+
+    val entries = viewModel.value.currentEntries.collectAsState().value
 
     // A surface container using the 'background' color from the theme
     Surface(
         modifier = Modifier.fillMaxSize(),
         color = MaterialTheme.colors.background
     ) {
-        Column{
-            Greeting("Android")
-            LazyColumn{
-                items(lists.count()) { index ->
-                    Row{
-                    Text(text = lists[index].name)
-                        Button(onClick = {
-                            scope.launch {
-                                viewModel.value.deleteList(lists[index])
+        Column {
+            Greeting(if (lists.isEmpty()) "No Lists Found!" else lists.first().name)
+            if (lists.isEmpty()) {
+                Text(text = "Create a list!")
+            } else {
+                LazyColumn() {
+                    items(entries.count()) { index ->
+                        Row {
+                            Text(text = if (entries.isEmpty()) "Nothing here" else entries[index].name)
+                            Button(onClick = {
+                                scope.launch {
+                                    viewModel.value.deleteEntry(entries[index])
+                                }
+                            }) {
+                                Text(text = "X")
                             }
-                        }) {
-                            Text(text = "X")
                         }
                     }
                 }
@@ -78,8 +85,25 @@ fun MainContent(viewModel: Lazy<MainActivityViewModel>){
             Row {
                 Button(onClick = {
                     scope.launch {
-                        viewModel.value.addList(
-                            ListDto(UUID.randomUUID(), "test 3", "test description")
+                        val list: ListDto
+                        if (lists.isEmpty()) {
+                            list = ListDto(
+                                UUID.randomUUID(),
+                                "test",
+                                "test desc"
+                            )
+
+                            viewModel.value.addList(list)
+                            viewModel.value.currentList = list
+                        }
+
+                        viewModel.value.addEntry(
+                            EntryDto(
+                                UUID.randomUUID(),
+                                viewModel.value.currentList.id,
+                                "test entry",
+                                "test description",
+                            )
                         )
                     }
                 }) {
@@ -87,7 +111,7 @@ fun MainContent(viewModel: Lazy<MainActivityViewModel>){
                 }
                 Button(onClick = {
                     scope.launch {
-                        viewModel.value.deleteAllLists()
+                        viewModel.value.deleteAllEntries(viewModel.value.currentList.id)
                     }
                 }) {
                     Text(text = "Delete All")
@@ -97,23 +121,7 @@ fun MainContent(viewModel: Lazy<MainActivityViewModel>){
     }
 }
 
-fun addList(list: ListDto) {
-    /*
-    scope.launch {
-        db.listDao().insert(list)
-    }
-     */
-}
-
 @Composable
-fun Greeting(name: String) {
-    Text(text = "Hello $name!")
-}
-
-@Preview(showBackground = true)
-@Composable
-fun DefaultPreview() {
-    ShoppingListTheme {
-        Greeting("Android")
-    }
+fun Greeting(listName: String) {
+    Text(text = "Current List: $listName")
 }

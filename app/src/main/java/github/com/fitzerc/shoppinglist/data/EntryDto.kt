@@ -31,7 +31,7 @@ constructor(
     val description: String,
 
     @ColumnInfo(name = "sort_order")
-    val sortOrder: Int,
+    val sortOrder: Int = -999,
 
     @field:TypeConverters(DateConverter::class)
     @ColumnInfo(name = "entry_date")

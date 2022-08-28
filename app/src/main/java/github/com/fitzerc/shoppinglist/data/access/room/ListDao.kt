@@ -1,4 +1,4 @@
-package github.com.fitzerc.shoppinglist.data.access.room.ListDao
+package github.com.fitzerc.shoppinglist.data.access.room
 
 import androidx.room.*
 import github.com.fitzerc.shoppinglist.data.ListDto
