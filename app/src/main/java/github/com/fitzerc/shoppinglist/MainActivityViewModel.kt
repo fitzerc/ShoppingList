@@ -53,8 +53,10 @@ class MainActivityViewModel @Inject constructor(private val db: ShoppingListData
                 .collect {
                     if (it.isEmpty()) {
                         Log.d("DataAccess", "No lists found")
+                    } else {
+                        _lists.value = it
+                        currentList = _lists.value[0]
                     }
-                    _lists.value = it
                 }
         }
     }

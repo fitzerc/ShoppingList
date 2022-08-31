@@ -1,22 +1,21 @@
 package github.com.fitzerc.shoppinglist
 
 import android.os.Bundle
+import android.util.Log
 import androidx.activity.ComponentActivity
 import androidx.activity.compose.setContent
 import androidx.activity.viewModels
-import androidx.compose.foundation.layout.Column
-import androidx.compose.foundation.layout.Row
-import androidx.compose.foundation.layout.fillMaxSize
+import androidx.compose.foundation.background
+import androidx.compose.foundation.border
+import androidx.compose.foundation.layout.*
 import androidx.compose.foundation.lazy.LazyColumn
-import androidx.compose.material.Button
-import androidx.compose.material.MaterialTheme
-import androidx.compose.material.Surface
-import androidx.compose.material.Text
+import androidx.compose.material.*
 import androidx.compose.runtime.Composable
 import androidx.compose.runtime.collectAsState
 import androidx.compose.ui.ExperimentalComposeUiApi
 import androidx.compose.ui.Modifier
-import androidx.compose.ui.tooling.preview.Preview
+import androidx.compose.ui.graphics.Color
+import androidx.compose.ui.unit.dp
 import dagger.hilt.android.AndroidEntryPoint
 import github.com.fitzerc.shoppinglist.data.EntryDto
 import github.com.fitzerc.shoppinglist.data.ListDto
@@ -62,61 +61,56 @@ fun MainContent(viewModel: Lazy<MainActivityViewModel>) {
         modifier = Modifier.fillMaxSize(),
         color = MaterialTheme.colors.background
     ) {
-        Column {
-            Greeting(if (lists.isEmpty()) "No Lists Found!" else lists.first().name)
-            if (lists.isEmpty()) {
-                Text(text = "Create a list!")
-            } else {
-                LazyColumn() {
-                    items(entries.count()) { index ->
-                        Row {
-                            Text(text = if (entries.isEmpty()) "Nothing here" else entries[index].name)
-                            Button(onClick = {
-                                scope.launch {
-                                    viewModel.value.deleteEntry(entries[index])
-                                }
-                            }) {
-                                Text(text = "X")
-                            }
-                        }
-                    }
+        Column(modifier = Modifier.fillMaxHeight()) {
+        //Column {
+            TopAppBar(
+                title = { Text(text = "MagniList") },
+                backgroundColor = MaterialTheme.colors.primary
+            )
+
+            ListLazyColumn(entries = entries, onEntryDeleteClick = {
+                scope.launch {
+                    viewModel.value.deleteEntry(it)
                 }
-            }
-            Row {
-                Button(onClick = {
+            })
+
+            BottomActionBar(
+                curListId = viewModel.value.currentList.id,
+                scope = scope,
+                onAddClicked = {
                     scope.launch {
-                        val list: ListDto
+                        var tmpListId = it.listId
+
                         if (lists.isEmpty()) {
-                            list = ListDto(
-                                UUID.randomUUID(),
-                                "test",
-                                "test desc"
+                            Log.d("DataAccess", "No lists found, creating default.")
+                            val defaultList = ListDto(
+                                id = UUID.randomUUID(),
+                                name = "Default List",
+                                description = "Default list automatically created by app.",
                             )
 
-                            viewModel.value.addList(list)
-                            viewModel.value.currentList = list
+                            viewModel.value.addList(defaultList)
+                            viewModel.value.currentList = defaultList
+
+                            tmpListId = defaultList.id
                         }
 
-                        viewModel.value.addEntry(
-                            EntryDto(
-                                UUID.randomUUID(),
-                                viewModel.value.currentList.id,
-                                "test entry",
-                                "test description",
-                            )
-                        )
+                        viewModel.value.addEntry(EntryDto(
+                            id = it.id,
+                            listId = tmpListId,
+                            name = it.name,
+                            description = it.description,
+                            sortOrder = it.sortOrder,
+                            entryDate = it.entryDate
+                        ))
                     }
-                }) {
-                    Text(text = "Add")
-                }
-                Button(onClick = {
+                },
+                onDelAllClicked = {
                     scope.launch {
-                        viewModel.value.deleteAllEntries(viewModel.value.currentList.id)
+                        viewModel.value.deleteAllEntries(it)
                     }
-                }) {
-                    Text(text = "Delete All")
                 }
-            }
+            )
         }
     }
 }
@@ -124,4 +118,62 @@ fun MainContent(viewModel: Lazy<MainActivityViewModel>) {
 @Composable
 fun Greeting(listName: String) {
     Text(text = "Current List: $listName")
+}
+
+@Composable
+fun ListLazyColumn(entries: List<EntryDto>, onEntryDeleteClick: (EntryDto) -> Unit) {
+    if (entries.isEmpty()) {
+        Text(text = "Uh Oh! No lists found.")
+    } else {
+        LazyColumn(modifier = Modifier.fillMaxHeight()) {
+            items(entries.count()) { index ->
+                ListEntryRow(entries[index], onDeleteClick = {
+                    onEntryDeleteClick(entries[index])
+                })
+            }
+        }
+    }
+}
+
+@Composable
+fun ListEntryRow(entry: EntryDto, onDeleteClick: (EntryDto) -> Unit) {
+    Row {
+        Text(entry.name)
+        Button(onClick = { onDeleteClick(entry) }) {
+            Text(text = "X")
+        }
+    }
+}
+
+@Composable
+fun BottomActionBar(
+    curListId: UUID,
+    scope: CoroutineScope,
+    onAddClicked: (EntryDto) -> Unit,
+    onDelAllClicked: (UUID) -> Unit
+) {
+    Row (modifier = Modifier
+        .fillMaxSize()
+        .border(2.dp, Color.Cyan)) {
+        //Add Button
+        Button(modifier = Modifier.background(MaterialTheme.colors.primary), onClick = {
+            onAddClicked(
+                EntryDto(
+                    UUID.randomUUID(),
+                    curListId,
+                    "test entry",
+                    "test description",
+                )
+            )
+        }) {
+            Text(text = "Add")
+        }
+
+        //Delete All Button
+        Button(
+            modifier = Modifier.background(MaterialTheme.colors.primary),
+            onClick = { scope.launch { onDelAllClicked(curListId) } }) {
+            Text(text = "Delete All")
+        }
+    }
 }
