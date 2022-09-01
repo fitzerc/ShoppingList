@@ -5,16 +5,21 @@ import android.util.Log
 import androidx.activity.ComponentActivity
 import androidx.activity.compose.setContent
 import androidx.activity.viewModels
+import androidx.compose.compiler.plugins.kotlin.ComposeFqNames.remember
 import androidx.compose.foundation.background
 import androidx.compose.foundation.border
 import androidx.compose.foundation.layout.*
 import androidx.compose.foundation.lazy.LazyColumn
+import androidx.compose.foundation.shape.RoundedCornerShape
 import androidx.compose.material.*
-import androidx.compose.runtime.Composable
-import androidx.compose.runtime.collectAsState
+import androidx.compose.material.icons.Icons
+import androidx.compose.material.icons.filled.Add
+import androidx.compose.material.icons.outlined.Close
+import androidx.compose.runtime.*
 import androidx.compose.ui.ExperimentalComposeUiApi
 import androidx.compose.ui.Modifier
 import androidx.compose.ui.graphics.Color
+import androidx.compose.ui.text.input.TextFieldValue
 import androidx.compose.ui.unit.dp
 import dagger.hilt.android.AndroidEntryPoint
 import github.com.fitzerc.shoppinglist.data.EntryDto
@@ -56,63 +61,78 @@ fun MainContent(viewModel: Lazy<MainActivityViewModel>) {
 
     val entries = viewModel.value.currentEntries.collectAsState().value
 
-    // A surface container using the 'background' color from the theme
-    Surface(
-        modifier = Modifier.fillMaxSize(),
-        color = MaterialTheme.colors.background
-    ) {
-        Column(modifier = Modifier.fillMaxHeight()) {
-        //Column {
+    val scaffoldState = rememberScaffoldState(rememberDrawerState(DrawerValue.Closed))
+    Scaffold(
+        scaffoldState = scaffoldState,
+        topBar = {
             TopAppBar(
-                title = { Text(text = "MagniList") },
+                title = {
+                    TopActionBar(currentList = viewModel.value.currentList, onAddClicked = {
+                        scope.launch {
+                            var tmpListId = it.listId
+
+                            if (lists.isEmpty()) {
+                                Log.d("DataAccess", "No lists found, creating default.")
+                                val defaultList = ListDto(
+                                    id = UUID.randomUUID(),
+                                    name = "Default List",
+                                    description = "Default list automatically created by app.",
+                                )
+
+                                viewModel.value.addList(defaultList)
+                                viewModel.value.currentList = defaultList
+
+                                tmpListId = defaultList.id
+                            }
+
+                            viewModel.value.addEntry(
+                                EntryDto(
+                                    id = it.id,
+                                    listId = tmpListId,
+                                    name = it.name,
+                                    description = it.description,
+                                    sortOrder = it.sortOrder,
+                                    entryDate = it.entryDate
+                                )
+                            )
+                        }
+
+                    })
+                },
                 backgroundColor = MaterialTheme.colors.primary
             )
-
+        },
+        /*
+        floatingActionButtonPosition = FabPosition.End,
+        floatingActionButton = {
+            FloatingActionButton(onClick = {}) {
+                Icon(imageVector = Icons.Default.Add, contentDescription = "fab icon")
+            }
+        },
+        drawerContent = { Text(text = "Drawer Menu 1") },
+         */
+        content = {
+            val p = it
             ListLazyColumn(entries = entries, onEntryDeleteClick = {
                 scope.launch {
                     viewModel.value.deleteEntry(it)
                 }
             })
-
-            BottomActionBar(
-                curListId = viewModel.value.currentList.id,
-                scope = scope,
-                onAddClicked = {
-                    scope.launch {
-                        var tmpListId = it.listId
-
-                        if (lists.isEmpty()) {
-                            Log.d("DataAccess", "No lists found, creating default.")
-                            val defaultList = ListDto(
-                                id = UUID.randomUUID(),
-                                name = "Default List",
-                                description = "Default list automatically created by app.",
-                            )
-
-                            viewModel.value.addList(defaultList)
-                            viewModel.value.currentList = defaultList
-
-                            tmpListId = defaultList.id
+        },
+        bottomBar = {
+            BottomAppBar(backgroundColor = MaterialTheme.colors.primary) {
+                BottomActionBar(
+                    curListId = viewModel.value.currentList.id,
+                    scope = scope,
+                    onDelAllClicked = {
+                        scope.launch {
+                            viewModel.value.deleteAllEntries(it)
                         }
-
-                        viewModel.value.addEntry(EntryDto(
-                            id = it.id,
-                            listId = tmpListId,
-                            name = it.name,
-                            description = it.description,
-                            sortOrder = it.sortOrder,
-                            entryDate = it.entryDate
-                        ))
                     }
-                },
-                onDelAllClicked = {
-                    scope.launch {
-                        viewModel.value.deleteAllEntries(it)
-                    }
-                }
-            )
+                )
+            }
         }
-    }
+    )
 }
 
 @Composable
@@ -121,9 +141,65 @@ fun Greeting(listName: String) {
 }
 
 @Composable
+fun TopActionBar(
+    currentList: ListDto,
+    onAddClicked: (EntryDto) -> Unit
+) {
+    var newEntryText by remember { mutableStateOf(TextFieldValue("")) }
+
+    Row(horizontalArrangement = Arrangement.Center, modifier = Modifier.padding(0.dp)) {
+        //TODO:
+        //add icon?
+        TextField(
+            modifier = Modifier
+                .fillMaxWidth(.75f)
+                .padding(top = 1.dp),
+            value = newEntryText,
+            onValueChange = { newEntryText = it },
+            shape = RoundedCornerShape(8.dp),
+            singleLine = true,
+            trailingIcon = {
+                if (newEntryText.text.isNotEmpty()) {
+                    IconButton(onClick = { newEntryText = TextFieldValue("") }) {
+                        Icon(
+                            imageVector = Icons.Outlined.Close,
+                            contentDescription = null
+                        )
+                    }
+                }
+            },
+            //TODO: use theme instead of DarkGray
+            placeholder = {
+                Text(
+                    color = Color.DarkGray,
+                    text = "New Entry",
+                )
+            })
+
+        Button(
+            onClick = {
+                onAddClicked(
+                    EntryDto(
+                        UUID.randomUUID(),
+                        currentList.id,
+                        newEntryText.text,
+                        "",
+                    )
+                )
+
+                newEntryText = TextFieldValue("")
+            }) {
+            Text(text = "+")
+        }
+    }
+}
+
+@Composable
 fun ListLazyColumn(entries: List<EntryDto>, onEntryDeleteClick: (EntryDto) -> Unit) {
     if (entries.isEmpty()) {
-        Text(text = "Uh Oh! No lists found.")
+        Column(modifier = Modifier.fillMaxHeight()) {
+            Text(text = "Uh Oh! No lists found.")
+        }
     } else {
         LazyColumn(modifier = Modifier.fillMaxHeight()) {
             items(entries.count()) { index ->
@@ -149,26 +225,12 @@ fun ListEntryRow(entry: EntryDto, onDeleteClick: (EntryDto) -> Unit) {
 fun BottomActionBar(
     curListId: UUID,
     scope: CoroutineScope,
-    onAddClicked: (EntryDto) -> Unit,
     onDelAllClicked: (UUID) -> Unit
 ) {
-    Row (modifier = Modifier
-        .fillMaxSize()
-        .border(2.dp, Color.Cyan)) {
-        //Add Button
-        Button(modifier = Modifier.background(MaterialTheme.colors.primary), onClick = {
-            onAddClicked(
-                EntryDto(
-                    UUID.randomUUID(),
-                    curListId,
-                    "test entry",
-                    "test description",
-                )
-            )
-        }) {
-            Text(text = "Add")
-        }
-
+    Row(
+        modifier = Modifier
+            .fillMaxSize()
+    ) {
         //Delete All Button
         Button(
             modifier = Modifier.background(MaterialTheme.colors.primary),
