@@ -23,7 +23,7 @@ class MainActivityViewModel @Inject constructor(private val db: ShoppingListData
     val lists = _lists.asStateFlow()
 
     var currentList: ListDto = if (lists.value.isEmpty())
-        ListDto(UUID.randomUUID(), "Placeholder", "")
+        ListDto(UUID.randomUUID(), "My List", "Default list automatically created by app.")
     else
         lists.value[0]
     set(value) {
